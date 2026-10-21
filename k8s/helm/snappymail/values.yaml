@@ -1,0 +1,44 @@
+# Default values for snappymail.
+tlsHostname: snappymail.example.com
+deployment:
+  env:
+    debug: "false"
+    log_to_stdout: "true"
+    memory_limit: 256M
+    upload_max_size: 25M
+  containerPorts:
+  - containerPort: 8888
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+volumeMounts:
+- mountPath: /var/lib/snappymail/_data_
+  name: share
+  subPath: snappymail/data
+volumes:
+- name: share
+  hostPath: { path: /var/lib/docker/k8s-volumes/share }
+
+image:
+  repository: djmaze/snappymail
+  pullPolicy: IfNotPresent
+  # tag: default
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount: {}
+service:
+  clusterIP: None
+  ports:
+  - { port: 80, targetPort: 8888 }
+  type: ClusterIP
+autoscaling:
+  enabled: false
+gateway:
+  enabled: true
+  external: true
+  name: gateway-2

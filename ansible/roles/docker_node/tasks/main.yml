@@ -1,0 +1,12 @@
+---
+# main.yml
+
+# Set up all packages, volumes, security definitions and services
+#  for a docker swarm node
+
+- import_tasks: security.yml
+- import_tasks: repos.yml
+- include_tasks: kernel.yml
+  when: kernel.non_stock
+- import_tasks: packages.yml
+- import_tasks: docker.yml

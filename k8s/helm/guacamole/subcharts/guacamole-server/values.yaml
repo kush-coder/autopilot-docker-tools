@@ -1,0 +1,46 @@
+# Default values for guacamole-server.
+tlsHostname: guacamole.example.com
+deployment:
+  containerPorts:
+  - { containerPort: 8080 }
+  # environment variables defined in parent
+  env: {}
+  xenv: []
+image:
+  repository: guacamole/guacamole
+  pullPolicy: IfNotPresent
+  # tag: default
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  enabled: false
+service:
+  clusterIP: None
+  ports:
+  - { port: 80, targetPort: 8080, name: guacamole-server }
+  type: ClusterIP
+autoscaling:
+  enabled: false
+gateway:
+  enabled: true
+  routeRules:
+  - backendRefs:
+    - name: guacamole-guacamole-server
+      port: 80
+    matches:
+    - path:
+        type: PathPrefix
+        value: /
+  - filters:
+    - requestRedirect:
+        path:
+          replaceFullPath: /guacamole
+          type: ReplaceFullPath
+        statusCode: 302
+      type: RequestRedirect
+    matches:
+    - path:
+        type: Exact
+        value: /

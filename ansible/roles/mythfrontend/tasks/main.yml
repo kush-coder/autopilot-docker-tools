@@ -1,0 +1,20 @@
+---
+# main.yml
+
+- include_vars: "{{ansible_distribution_release }}.yml"
+
+- name: Set up xorg.conf.d
+  file:
+    path: "{{ x11_config_path }}"
+    state: directory
+
+- include_tasks: "{{ ansible_os_family | lower }}/packages.yml"
+- include_tasks: "{{ ansible_os_family | lower }}/ir-keytable.yml"
+
+- include_tasks: autosuspend.yml
+  when: suspend | length > 0
+
+- include_tasks: drivers/{{ display_driver.type }}.yml
+
+- include_tasks: setup.yml
+- include_tasks: "{{ ansible_os_family | lower }}/desktop.yml"

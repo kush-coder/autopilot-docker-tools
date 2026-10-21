@@ -1,0 +1,27 @@
+---
+# main.yml
+
+# Handlers for services and management actions
+
+- name: Restart docker
+  service:
+    name: docker
+    state: restarted
+
+- name: Restart snmpd
+  service:
+    name: snmpd
+    state: restarted
+
+- name: Restart sshd
+  service:
+    name: ssh
+    state: restarted
+
+- name: Reload systemd
+  systemd:
+    name: docker.service
+    daemon_reload: yes
+
+- name: Update CA certificates
+  command: update-ca-certificates

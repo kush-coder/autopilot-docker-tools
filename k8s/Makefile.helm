@@ -1,0 +1,53 @@
+##########
+# Helm
+##########
+export TARBALL = helm-$(VERSION_HELM)-linux-amd64.tar.gz
+CHARTS = $(notdir $(wildcard ./helm/*))
+INSTANCES = $(notdir $(wildcard ./helm/instances/*))
+.PHONY: helm_install
+
+helm_install: /usr/local/bin/helm
+	helm repo add instantlinux https://instantlinux.github.io/docker-tools/
+helm_list:
+	@helm list --time-format="Mon Jan 2 15:04" --all-namespaces \
+	  --kube-context=sudo
+
+# TODO retire values.yaml
+$(CHARTS):: %: ../admin/services/values.yaml helm/%/Chart.lock
+	@echo --$(NOTICE) $@--
+ifeq ($(ACTION), delete)
+	@helm uninstall --kube-context=sudo -n $(K8S_NAMESPACE) $@
+else
+	@$(eval OVERRIDE := $(shell [ -s ../admin/services/values/$@.yaml ] \
+	  && echo "-f ../admin/services/values/$@.yaml"))
+	helm upgrade --install -f $< $(OVERRIDE) $(XARGS) $@ ./helm/$@
+endif
+	@helm list --time-format="Mon Jan 2 15:04" --selector name=$@
+
+# TODO this is identical to above but for subdir, DRY it out
+#   the helmify project is just too exhausting
+$(INSTANCES):: %: ../admin/services/values.yaml helm/instances/%/Chart.lock
+	@echo --$(NOTICE) $@--
+ifeq ($(ACTION), delete)
+	@helm uninstall --kube-context=sudo -n $(K8S_NAMESPACE) $@
+else
+	@$(eval OVERRIDE := $(shell [ -s ../admin/services/values/$@.yaml ] \
+	  && echo "-f ../admin/services/values/$@.yaml"))
+	helm upgrade --install -f $< $(OVERRIDE) $(XARGS) $@ ./helm/instances/$@
+endif
+	@helm list --time-format="Mon Jan 2 15:04" --selector name=$@
+
+/usr/local/bin/helm:
+	wget -O /tmp/$(TARBALL) https://get.helm.sh/$(TARBALL)
+	wget -O /tmp/$(TARBALL).sha256 https://get.helm.sh/$(TARBALL).sha256sum
+	cd /tmp && sha256sum -c $(TARBALL).sha256
+	tar xf /tmp/$(TARBALL) -C /tmp
+	sudo mv /tmp/linux-amd64/helm /usr/local/bin
+	rm -r /tmp/$(TARBALL)* /tmp/linux-amd64
+
+CHARTLOCK = $(addsuffix /Chart.lock, $(addprefix helm/, $(CHARTS))) \
+	  $(addsuffix /Chart.lock, $(addprefix helm/instances/, $(INSTANCES)))
+$(CHARTLOCK):
+	helm dependency update $(dir $@)
+
+infra: XARGS=--kube-context=sudo

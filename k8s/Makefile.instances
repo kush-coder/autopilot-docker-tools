@@ -1,0 +1,20 @@
+# Resource instances
+#
+#  Some resources require per-deployment environment variables
+#  Use this file to customize those
+
+mariadb-galera::
+	@echo Please specify a specific instance e.g. db03 && exit 1
+
+db00 db01 db02 db03:: etcd
+
+nut-upsd::
+	@echo Invoke 'make nut-xx' (e.g. nut-01) instead
+	@exit 1
+
+samba-dc::
+	@echo Invoke 'make dcxx' target for domain controllers
+	@exit 1
+
+wordpress::
+	@echo Please specify a specific instance e.g. wordpress-ci && exit 1

@@ -1,0 +1,24 @@
+{
+    "alpine-packages": [
+	"data-sync",
+	"dhcpd-dns-pxe",
+	"nagiosql"
+    ],
+    "ubuntu-packages": [
+	"blacklist"
+    ],
+    "images": [
+	"alpine",
+	"instantlinux/haproxy-keepalived",
+	"ghcr.io/immich-app/immich-machine-learning",
+	"mariadb",
+	"instantlinux/nagiosql"
+    ],
+    "charts": [
+	"il-v1",
+	"jira",
+	"restic",
+	"squirrelmail",
+	"wordpress"
+    ]
+}

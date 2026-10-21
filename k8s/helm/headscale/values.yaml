@@ -1,0 +1,151 @@
+# Default values for headscale.
+
+# Note: when deploying this under kubernetes with the haproxy-keepalived
+#  service (provided in this repo for bare-metal deployments), please add the
+#  following directive to the haproxy definition for port 443 ingress:
+#
+#     timeout tunnel 30m
+#
+# Otherwise, you might see the following errors repeated about every 40
+#  seconds in syslog from each tailscaled client:
+#
+#  tailscaled[5712]: Received error: PollNetMap: unexpected EOF
+#  tailscaled[5712]: control: controlhttp: forcing port 443 dial due to recent noise dial
+#  tailscaled[5712]: [RATELIMIT] format("control: [v\x00JSON]%d%s") (2 dropped)
+
+tlsHostname: headscale.example.com
+deployment:
+  command: [ headscale, serve ]
+  containerPorts:
+  - containerPort: 8080
+  - containerPort: 9090
+  - containerPort: 3478
+    protocol: UDP
+    name: stun
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+volumeMounts:
+- name: config
+  mountPath: /etc/headscale/config.yaml
+  subPath: config.yaml
+- name: share
+  mountPath: /var/lib/headscale
+  subPath: headscale
+volumes:
+- name: config
+  configMap:
+    name: headscale
+- name: share
+  hostPath: { path: /var/lib/docker/k8s-volumes/share }
+
+image:
+  repository: headscale/headscale
+  pullPolicy: IfNotPresent
+  # tag: default
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount: {}
+service:
+  clusterIP: None
+  ports:
+  - { port: 8080, targetPort: 8080, name: headscale }
+  - { port: 3478, targetPort: 3478, name: stun, protocol: UDP }
+  - { port: 41641, targetPort: 41461, name: wireguard, protocol: UDP }
+  type: ClusterIP
+autoscaling:
+  enabled: false
+gateway:
+  enabled: true
+  external: true
+  name: gateway-2
+  routeRules:
+  - name: headscale
+    backendRefs:
+    - group: ""
+      kind: Service
+      name: headscale
+      port: 8080
+      weight: 1
+    matches:
+    - path:
+        type: PathPrefix
+        value: /
+  - name: tailscale
+    backendRefs:
+    - group: ""
+      kind: Service
+      name: headscale
+      port: 8080
+      weight: 1
+    matches:
+    - path:
+        type: PathPrefix
+        value: /ts2021
+  - name: headplane
+    backendRefs:
+    - group: ""
+      kind: Service
+      name: headscale-headplane
+      port: 3000
+      weight: 1
+    matches:
+    - path:
+        type: PathPrefix
+        value: /admin
+
+configmap:
+  data:
+    config.yaml: |
+      server_url: https://headscale.example.com
+      listen_addr: 0.0.0.0:8080
+      metrics_listen_addr: 0.0.0.0:9090
+      noise:
+        private_key_path: /var/lib/headscale/noise_private.key
+      prefixes:
+        v4: 100.64.0.0/10
+        v6: fd7a:115c:a1e0::/48
+      derp:
+        server:
+          enabled: false
+          region_id: 999
+          region_code: "headscale"
+          region_name: "Headscale Embedded DERP"
+          stun_listen_addr: "0.0.0.0:3478"
+          private_key_path: /var/lib/headscale/derp_server_private.key
+          automatically_add_embedded_derp_region: true
+        urls:
+        - https://controlplane.tailscale.com/derpmap/default
+        paths: []
+        auto_update_enabled: true
+        update_frequency: 24h
+      disable_check_updates: false
+      node:
+        expire: 0
+        ephemeral:
+          inactivity_timeout: 30m
+      database:
+        type: sqlite3
+        sqlite:
+          path: /var/lib/headscale/db.sqlite
+          write_ahead_log: true
+          wal_autocheckpoint: 1000
+      log:
+        level: info
+        format: text
+      dns:
+        magic_dns: false
+        override_local_dns: false
+        nameservers:
+        - 1.1.1.1
+        - 1.0.0.1
+
+headplane:
+  enabled: true
+  image:
+    tag: 0.7.0

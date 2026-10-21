@@ -1,0 +1,52 @@
+---
+# main.yml
+
+- name: Install system packages
+  ansible.builtin.apt:
+    name: "{{ ubuntu_packages }}"
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Create mount points
+  ansible.builtin.file:
+    dest: "{{ item.value.path }}"
+    state: directory
+  with_dict: "{{ luks_volumes | combine(network_mounts) |
+                 combine(local_volumes) }}"
+
+- name: Make mount points immutable
+  ansible.builtin.shell: >
+    /bin/mountpoint {{ item.value.path }} ||
+    /usr/bin/chattr +i {{ item.value.path }}
+  with_dict: "{{ luks_volumes | combine(network_mounts) |
+                 combine(local_volumes) }}"
+  changed_when: False
+
+- name: Create volumes
+  ansible.builtin.lvol:
+    lv: "{{ item.key }}"
+    vg: "{{ item.value.vg }}"
+    shrink: no
+    size: "{{ item.value.size }}"
+  with_dict: "{{ luks_volumes }}"
+  notify:
+  - Cryptsetup resize
+  - Filesystem resize
+
+- import_tasks: encrypted.yml
+- import_tasks: cifs.yml
+- import_tasks: swap.yml
+  when: swap_vol.enabled
+
+- name: Network and local fstab entries
+  ansible.builtin.mount:
+    fstype: "{{ item.value.type if 'type' in item.value else fs_type }}"
+    path: "{{ item.value.path }}"
+    src: "{{ item.key }}"
+    opts: "{{ item.value.options if 'options' in item.value else 'defaults' }}"
+    state: mounted
+  with_dict: "{{ network_mounts | combine(local_volumes) }}"
+
+- name: Invoke local crypt-vols startup
+  ansible.builtin.systemd:
+    name: crypt-vols
+    state: started

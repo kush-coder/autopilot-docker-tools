@@ -1,0 +1,10 @@
+#!/bin/sh
+{{ ansible_managed | comment }}
+
+# Reload ethernet
+
+case "$1" in
+    resume|thaw)
+        systemctl restart networking
+        ;;
+esac

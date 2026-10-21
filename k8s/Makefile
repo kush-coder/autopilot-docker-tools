@@ -1,0 +1,239 @@
+# INITIAL SETUP
+# -------------
+#
+# Step 2: configure kubernetes master resources
+#
+# This is the second step of three in kubernetes installation--picks up where
+# kubeadm leaves off, tightening security and setting up the cluster for
+# routine "user-level" administration of a namespace so services can
+# be managed without distributing the kubernetes-admin client key.
+#
+# Step 1: cd ../ansible; make k8s-master
+#
+# Usage - after step 1, review Makefile.vars, set your override vars, then do
+#   make install
+#   for node in kube1.domain kube2.domain <etc>; do
+#     NODE=$node make persistent_dirs
+#   done
+#   (run step 3: ansible playbook k8s-node)
+#   make node_labels
+#
+# If setting up MythTV, mount the main storage on each of two nodes as
+#     /var/lib/docker/k8s-volumes/mythtv and invoke:
+#   NODE=kube1.domain make mythtv_vol
+#   NODE=kube2.domain make mythtv_vol
+#
+# If running a single-node minikube-like installation, do this:
+#   NODE=(master).domain make untaint_master
+#
+# If running a cluster, proceed to step 3. Look for k8s-node playbook in the
+#   ansible directory.
+#
+# Then for routine administration of services defined as resource YAML
+# files here in this directory:
+#   make <service>
+#   ACTION=delete make <service>
+#
+# Storage volumes are direct-attached of type 'local-storage' under a specified
+# path. Two pools are generated for dynamic provisioning, and the following
+# three are set to specific named locations for ease of administration:
+#
+#   admin - read-only continuously synchronized config data per service
+#   backup - use for centralizing backup content per service
+#   share - read-write continuously synchronized across cluster
+#
+# Define additional large storage volumes using the volumes role of ansible
+# and set an environment variable LOCAL_VOLUMES to generate k8s pvs for
+# each node.
+
+# AFTER INITIAL SETUP
+# -------------------
+#
+# Once you have your first namespace set up, this Makefile can handle additional
+# maintenance tasks:
+#
+# 1) Adding a new namespace
+#   K8S_NAMESPACE=<new> make namespace_config
+#   sops -d secrets/regcred.yml | envsubst | kubectl create \
+#     -n $K8S_NAMESPACE --context=sudo -f -
+# 2) Adding a new node
+#   export K8S_WORKER_COUNT=$newcount
+#   make node_labels
+#   K8S_NODES=$node make persistent
+#   NODE=$node make persistent_dirs
+#
+# Always use fqdn for NODE names.
+
+ACTION          ?= apply
+CLUSTER         ?= kubernetes
+ADMIN_CTX       ?= --context=kubernetes-admin@$(CLUSTER)
+
+include Makefile.vars
+include Makefile.versions
+include Makefile.instances
+
+ifeq ($(ACTION), delete)
+  NOTICE=Removing
+else
+  NOTICE=Deploying
+endif
+
+all: imports $(INSTALL_YAML)
+
+##########
+# Installation
+##########
+.PHONY: envsubst imports install namespace_config node_labels \
+	persistent remote_volumes secrets sops untaint_master
+
+IMPORTS      = cert-manager flannel nodelocaldns
+INSTALL_YAML = $(basename $(wildcard install/*.yaml)) \
+          $(addprefix imports/, $(IMPORTS))
+VOLUMES_YAML = $(basename $(wildcard volumes/*.yaml))
+
+install: cluster_network imports install_imports namespace_config fluent-bit \
+	remote_volumes sops data-sync-ssh persistent secrets infra \
+	storage_localdefault
+
+namespace_config: install/namespace install/namespace-user secrets/regcred
+
+untaint_master:
+	@echo -e '** Allowing workload on master risks admin-cert security compromise **\n'
+	kubectl $(ADMIN_CTX) taint nodes $(NODE) node-role.kubernetes.io/master-
+
+node_labels:
+	./scripts/node_labels.sh
+
+data-sync-ssh:
+	if ! (kubectl get secrets -n $(K8S_NAMESPACE) | grep -q "^$@ "); then \
+	  cd ../images/data-sync && make $@; fi
+
+~/.kube/config.conf:
+	@./scripts/kube-conf-gen.sh ~/.kube/admin.conf $@ $(ADMIN_CTX) $(CLUSTER)
+	@echo -e \\n'Admin and user context configurations installed in ~/.kube'
+	@echo -e \\n'***** Save a copy of these files and keep secure !!!! *****'
+	@echo -e \\n'***** Do not lose or redistribute admin.conf or admin-user.* !! *****'\\n
+
+remote_volumes: $(VOLUMES_YAML)
+
+$(INSTALL_YAML) $(VOLUMES_YAML)::
+	@echo --$(NOTICE) $@--
+	@SERVICE_NAME=$(@F) \
+	  envsubst < $@.yaml | kubectl $(ADMIN_CTX) $(ACTION) -f -
+
+ifeq ($(shell uname -s),Darwin)
+envsubst: /usr/local/bin/envsubst
+else
+envsubst: /usr/bin/envsubst
+endif
+
+/usr/local/bin/envsubst:
+	brew install gettext && brew link --force gettext
+
+##########
+# Storage
+##########
+persistent:
+	./scripts/persistent.sh $(K8S_NODES)
+
+persistent_dirs:
+	ssh "$(NODE)" sudo 'mkdir -p $$(echo \
+	  $(K8S_VOLUMES_PATH)/pool-s/pv-$(POOL_SIZE_SMALL)-{0001..$(POOL_NUM_SMALL)} \
+	  $(K8S_VOLUMES_PATH)/pool-m/pv-$(POOL_SIZE_MEDIUM)-{0001..$(POOL_NUM_MEDIUM)}) \
+	  $(K8S_VOLUMES_PATH)/{$(shell echo $(NAMED_VOLUMES)|tr " " ,)}'
+	ssh "$(NODE)" sudo chmod 700 $(K8S_VOLUMES_PATH)/pool-[sm]
+
+mythtv_vol:
+	NAME=$(NODE)-mythtv VOLUME_ROOT=$(K8S_VOLUMES_PATH)/mythtv \
+	VOLUME_ID=$(shell uuidgen | cut -d - -f 1) \
+	VOLUME_SIZE=$(MYTHTV_VOL_SIZE) NODENAME=$(NODE) GROUP=mythtv \
+	make install/persistent-item
+
+storage_localdefault:
+	kubectl $(ADMIN_CTX) patch storageclass local-storage -p \
+	  '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+##########
+# Helm
+##########
+include Makefile.helm
+
+##########
+# Network
+##########
+include Makefile.network
+
+##########
+# Secrets
+##########
+include Makefile.sops
+
+##########
+# cert-manager
+##########
+
+# Note - need both, to define the CRD and the ClusterIssuer resources; define
+#     an override file for infra helm chart first and then:
+#   make imports/cert-manager
+#   make infra
+
+imports/cert-manager.yaml: imports/cert-manager-$(VERSION_CERT_MANAGER).yaml
+	ln -s $(notdir $<) $@
+imports/cert-manager-$(VERSION_CERT_MANAGER).yaml:
+	curl -sLo $@ https://github.com/cert-manager/cert-manager/releases/download/$(VERSION_CERT_MANAGER)/cert-manager.yaml
+
+# Run this once after imports/cert-manager
+cert-manager-gateway: 
+	kubectl patch deployment cert-manager --context=sudo -n cert-manager --type='json' -p='[ { "op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--enable-gateway-api" }, { "op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--enable-gateway-api-listenerset" }, { "op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--feature-gates=ListenerSets=true" } ]'
+
+##########
+# envoy-gateway
+##########
+imports/envoy-gateway.yaml: imports/envoy-gateway-$(VERSION_GATEWAY).yaml
+	ln -s $(notdir $<) $@
+imports/envoy-gateway-$(VERSION_GATEWAY).yaml:
+	curl -sLo $@ https://github.com/envoyproxy/gateway/releases/download/$(VERSION_GATEWAY)/install.yaml
+imports/envoy-gateway:: imports/envoy-gateway.yaml
+	@echo --$(NOTICE) $@ from server-side--
+	@SERVICE_NAME=$(@F) \
+	  envsubst < $@.yaml | kubectl $(ADMIN_CTX) $(ACTION) \
+	  --server-side --force-conflicts -f -
+
+##########
+# node-local-dns
+##########
+imports/nodelocaldns.yaml: imports/nodelocaldns-$(VERSION_NODE_LOCAL_DNS).yaml
+	ln -s $(notdir $<) $@
+imports/nodelocaldns-$(VERSION_NODE_LOCAL_DNS).yaml:
+	curl -sLo $@ https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/$(VERSION_NODE_LOCAL_DNS)/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml
+	sed -i -e "s/__PILLAR__LOCAL__DNS__/$(NODE_LOCAL_DNS_IP)/g; s/__PILLAR__DNS__DOMAIN__/cluster.local/g; s/__PILLAR__DNS__SERVER__/$(COREDNS_IP)/g" $@
+
+##########
+# Add-ons
+##########
+imports: $(foreach file,$(IMPORTS),imports/$(file).yaml)
+install_imports: $(foreach file, $(IMPORTS), imports/$(file))
+
+imports/kube-state-metrics: imports/kube-state-metrics-$(VERSION_KUBE_STATE_METRICS)
+	ln -s $(notdir $<) $@
+imports/kube-state-metrics-$(VERSION_KUBE_STATE_METRICS):
+	git clone --dept 1 --branch $(VERSION_KUBE_STATE_METRICS) \
+	 https://github.com/kubernetes/kube-state-metrics \
+	 imports/kube-state-metrics-$(VERSION_KUBE_STATE_METRICS)
+install_metrics: imports/kube-state-metrics
+	kubectl apply --context=sudo -k $</examples/standard
+
+imports/traefik-prom.yaml:
+	curl -sLo $@ https://raw.githubusercontent.com/mateobur/prometheus-monitoring-guide/master/traefik-prom.yaml
+
+SPLUNK_OPT = $(if $(LOG_TO_SPLUNK), -f install/fluent-bit-splunk.yaml, )
+fluent-bit: install/namespace.yaml
+	K8S_NAMESPACE=$(LOG_NAMESPACE) envsubst < $< | \
+	  kubectl apply --context=sudo -f -
+	helm repo add fluent https://fluent.github.io/helm-charts
+	helm repo update
+	@$(eval OVERRIDE := $(shell [ -s ../admin/services/values/$@.yaml ] \
+	  && echo "-f ../admin/services/values/$@.yaml"))
+	envsubst < install/fluent-bit.yaml | \
+	  helm install -f - $(SPLUNK_OPT) $(OVERRIDE) \
+	  --kube-context=sudo --namespace=$(LOG_NAMESPACE) $@ fluent/fluent-bit 

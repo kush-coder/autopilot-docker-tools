@@ -1,0 +1,38 @@
+---
+# TODO: invoke token create on master to generate token and cert hash
+
+- name: Set kubeadm configuration
+  ansible.builtin.copy:
+    dest: /etc/kubernetes/kubeadm-config.yaml
+    content: |
+      apiVersion: kubeadm.k8s.io/v1beta4
+      kind: JoinConfiguration
+      discovery:
+        bootstrapToken:
+          # Discover host IP rather than service vip, misleading error is:
+          #  "could not find a JWS signature in the cluster-info ConfigMap"
+          apiServerEndpoint: "{{ k8s.cplane_hostip }}:6443"
+          caCertHashes:
+          - "manually copy from token create --print-join-command"
+          token: "{{ vault_k8s.join_token }}"
+          unsafeSkipCAVerification: True
+      nodeRegistration:
+        criSocket: {{ k8s.cri_socket }}
+
+- name: Check if kubeadm has already run
+  ansible.builtin.stat:
+    path: "/etc/kubernetes/pki/ca.crt"
+  register: kubeadm_ca
+
+- name: Reset Kubernetes component
+  command: kubeadm reset --force --cri-socket {{ k8s.cri_socket }}
+  register: reset_cluster
+  when: not kubeadm_ca.stat.exists
+
+# This will fail because of stale token and hash values
+- name: Join to Kubernetes cluster
+  command: kubeadm join --config /etc/kubernetes/kubeadm-config.yaml
+  register: join_cluster
+  notify:
+  - Recreate kube-dns
+  when: not kubeadm_ca.stat.exists and reset_cluster is succeeded

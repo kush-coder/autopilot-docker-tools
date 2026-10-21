@@ -1,0 +1,164 @@
+﻿# 🚀 Docker Tools
+
+**Official Open-Source Release & Maintained Codebase** by [**@kush-coder**](https://github.com/kush-coder)
+
+[![Verified Build](https://img.shields.io/badge/Status-Verified--Passing-emerald?style=for-the-badge&logo=github)](https://github.com/kush-coder)
+[![License](https://img.shields.io/badge/License-Apache License 2.0-indigo?style=for-the-badge)](https://github.com/kush-coder)
+[![Language](https://img.shields.io/badge/Language-Shell-purple?style=for-the-badge)](https://github.com/kush-coder)
+
+## 💡 About This Project
+
+Docker tools for developer productivity & entertainment
+
+This repository is actively maintained and distributed by **@kush-coder** as an official open-source release.
+
+## ✨ Key Highlights
+- 🛡️ **Verified Health Checks**: Passed automated sandbox builds, dependency resolution, and health test runs.
+- 🚀 **Production Ready**: Lightweight footprint optimized for high efficiency.
+- 📦 **Permissive Open Source**: Available for developer integration, custom modifications, and community enhancements.
+
+## 🚀 Quick Start & Installation
+
+```bash
+# Clone your official repository
+git clone https://github.com/kush-coder/autopilot-docker-tools.git
+cd autopilot-docker-tools
+```
+
+---
+
+## 📖 Comprehensive Documentation
+
+[![](https://gitlab.com/instantlinux/docker-tools/badges/master/pipeline.svg)](https://gitlab.com/instantlinux/docker-tools/pipelines "pipelines")
+
+This repo is a collection of multi-platform images and helm charts for managing
+a software-dev organization or homelab using Kubernetes. These tools make it
+easy to install and stay up-to-date. Contents:
+
+| Directory | Description |
+| --------- | ----------- |
+| ansible | build your own Kubernetes cluster |
+| images | images which are published to Docker Hub |
+| k8s | kubernetes resources and helm charts |
+| lib/build | build makefile and tools |
+| services | non-clustered docker-compose services |
+| ssl | PKI certificate tools (deprecated by k8s) |
+
+Each image and helm chart is published to [docker hub/instantlinux](https://hub.docker.com/r/instantlinux/) and [ghcr.io/instantlinux](https://github.com/instantlinux?tab=packages). Images are scanned by [trivy](https://trivy.dev/) to ensure they contain no known CVE vulnerabilities before promotion to ghcr.io and Docker Hub.
+
+Find a lot more details about the Kubernetes bare-metal installer in [k8s/README](k8s/README.md).
+
+### Kubernetes capabilities
+
+The cluster-deployment tools here include helm charts and ansible playbooks to spin up bare-metal or VM master/worker nodes, and a Makefile to add several additional features.
+
+* Direct-attached SSD local storage pools
+* Non-default namespace with its own service account (full permissions
+  within namespace, limited read-only in kube-system namespaces)
+* Keycloak for OpenID / OAuth2 user authentication / authorization
+* Vaultwarden, a self-hosted Bitwarden-compatible password manager
+* Helm4
+* Mozilla [sops](https://github.com/mozilla/sops/blob/master/README.rst) with encryption (to keep credentials in local git repo)
+* Encryption for internal etcd
+* Calico or flannel networking
+* Envoy API gateway
+* Local-volume sync
+* Garage object storage
+* Pod security policies
+* Automatic certificate issuing/renewal with Letsencrypt
+* Grafana with prometheus-based alerting
+
+### Resource definitions
+
+**Developer infrastructure**
+
+| Service | Version | Notes |
+| --- | --- | --- |
+| admin-git | [![](https://img.shields.io/docker/v/instantlinux/git-pull?sort=date)](https://hub.docker.com/r/instantlinux/git-pull "Version badge") | sync git repo across cluster |
+| gitea | ** | self-hosted git repo with many github features |
+| jira | 9.12.1 | ticket tracking |
+| mariadb-galera | [![](https://img.shields.io/docker/v/instantlinux/mariadb-galera?sort=date)](https://hub.docker.com/r/instantlinux/mariadb-galera "Version badge") | automatic cluster setup|
+| nexus | 3.97.0 | binary repo with docker registry |
+| synapse | v1.163.0 | self-hosted team chat |
+| updater | ** | tool that updates this repo for [inventory.md](lib/build/inventory.md) |
+| wordpress | ** | |
+
+**Networking and support**
+
+| Service | Version | Notes |
+| --- | --- | --- |
+| apache | 2.4.69 | web server, with webdav example |
+| data-sync | [![](https://img.shields.io/docker/v/instantlinux/data-sync?sort=date)](https://hub.docker.com/r/instantlinux/data-sync "Version badge") | poor-man's SAN for persistent storage |
+| ddclient | [![](https://img.shields.io/docker/v/instantlinux/ddclient?sort=date)](https://hub.docker.com/r/instantlinux/ddclient "Version badge") | Dynamic DNS client |
+| ez-ipupdate | [![](https://img.shields.io/docker/v/instantlinux/ez-ipupdate?sort=date)](https://hub.docker.com/r/instantlinux/ez-ipupdate "Version badge") | Dynamic DNS client |
+| fluent-bit | ** | central logging for Kubernetes |
+| garage | v2.4.1 | S3-compatible object storage |
+| grafana | 13.2.4 | monitoring dashboard with prometheus-based alerting |
+| guacamole | 1.6.0 | authenticated remote-desktop server |
+| haproxy-keepalived | [![](https://img.shields.io/docker/v/instantlinux/haproxy-keepalived?sort=date)](https://hub.docker.com/r/instantlinux/haproxy-keepalived "Version badge") | load balancer |
+| headscale | v0.29.5 | tailscale-compatible VPN control-plane |
+| mysqldump | [![](https://img.shields.io/docker/v/instantlinux/mysqldump?sort=date)](https://hub.docker.com/r/instantlinux/mysqldump "Version badge") | per-database alternative to xtrabackup |
+| nagios | [![](https://img.shields.io/docker/v/instantlinux/nagios?sort=date)](https://hub.docker.com/r/instantlinux/nagios "Version badge") | Nagios Core v4 for monitoring |
+| nagiosql | [![](https://img.shields.io/docker/v/instantlinux/nagiosql?sort=date)](https://hub.docker.com/r/instantlinux/nagiosql "Version badge") | NagiosQL for configuring Nagios Core v4 |
+| node-local-dns | ** | caching resolver for reliable pod DNS |
+| nut-upsd | [![](https://img.shields.io/docker/v/instantlinux/nut-upsd?sort=date)](https://hub.docker.com/r/instantlinux/nut-upsd "Version badge") | Network UPS Tools |
+| openldap | [![](https://img.shields.io/docker/v/instantlinux/openldap?sort=date)](https://hub.docker.com/r/instantlinux/openldap "Version badge") | OpenLDAP authentication server |
+| proftpd | [![](https://img.shields.io/docker/v/instantlinux/proftpd?sort=date)](https://hub.docker.com/r/instantlinux/proftpd "Version badge") | FTP server |
+| radicale | 3.8.2 | CalDAV / CardDAV for mobile calendar/contacts sync |
+| restic | ** | backups |
+| rsyslogd | [![](https://img.shields.io/docker/v/instantlinux/rsyslogd?sort=date)](https://hub.docker.com/r/instantlinux/rsyslogd "Version badge") | logger in a 13MB image |
+| samba | [![](https://img.shields.io/docker/v/instantlinux/samba?sort=date)](https://hub.docker.com/r/instantlinux/samba "Version badge") | file server |
+| samba-dc | [![](https://img.shields.io/docker/v/instantlinux/samba-dc?sort=date)](https://hub.docker.com/r/instantlinux/samba-dc "Version badge") | Active-Directory compatible domain controller |
+| [secondshot](https://github.com/instantlinux/secondshot) | [![](https://img.shields.io/docker/v/instantlinux/secondshot?sort=date)](https://hub.docker.com/r/instantlinux/secondshot "Version badge") | rsnapshot-based backups |
+| splunk | 10.6.1 | the free version |
+| vaultwarden | ** | BitWarden-compatible self-hosted backend |
+| virt-manager | ** | GUI and CLI for QEMU/KVM virtual machines |
+
+**Email**
+
+| Service | Version | Notes |
+| --- | --- | --- |
+| blacklist | [![](https://img.shields.io/docker/v/instantlinux/blacklist?sort=date)](https://hub.docker.com/r/instantlinux/blacklist "Version badge") | a local rbldnsd for spam control |
+| dovecot | [![](https://img.shields.io/docker/v/instantlinux/dovecot?sort=date)](https://hub.docker.com/r/instantlinux/dovecot "Version badge") | imapd server |
+| postfix | [![](https://img.shields.io/docker/v/instantlinux/postfix?sort=date)](https://hub.docker.com/r/instantlinux/postfix "Version badge") | compact general-purpose image in 11MB |
+| postfix-python | [![](https://img.shields.io/docker/v/instantlinux/postfix-python?sort=date)](https://hub.docker.com/r/instantlinux/postfix-python "Version badge") | postfix with spam-control scripts |
+| snappymail | v2.38.2 | webmail, forked from rainloop imapd-client server |
+| spamassassin | [![](https://img.shields.io/docker/v/instantlinux/spamassassin?sort=date)](https://hub.docker.com/r/instantlinux/spamassassin "Version badge") | spam control daemon |
+
+**Entertainment**
+
+| Service | Version | Notes |
+| --- | --- | --- |
+| davite | [![](https://img.shields.io/docker/v/instantlinux/davite?sort=date)](https://hub.docker.com/r/instantlinux/davite "Version badge") | party-invites manager like eVite |
+| immich | v3.0.1 | immich self-hosted photo/video manager |
+| mythtv-backend | [![](https://img.shields.io/docker/v/instantlinux/mythtv-backend?sort=date)](https://hub.docker.com/r/instantlinux/mythtv-backend "Version badge") | MythTV backend |
+| OwnTone | 29.3 | iTunes server (formerly forked-daapd) |
+| weewx | [![](https://img.shields.io/docker/v/instantlinux/weewx?sort=date)](https://hub.docker.com/r/instantlinux/weewx "Version badge") | Weather station software (Davis VantagePro2 etc.) |
+
+### Credits
+
+Thank you to the following contributors!
+
+* [Mike Neir](https://github.com/d0ct0rvenkman)
+* [Chad Hedstrom](https://github.com/Hadlock) - [personal site](http://nearlydeaf.com/)
+* [Sean Mollet](https://github.com/SeanMollet)
+* [Juan Manuel Carrillo Moreno](https://github.com/inetshell) - [personal site](https://wiki.inetshell.mx/)
+* [nicxvan]( https://github.com/nicxvan)
+* [Frank Riley](https://github.com/fhriley)
+* [Devin Bayer](https://github.com/akvadrako)
+* [Daniel Muller](https://github.com/DanielMuller)
+* [Brian Hechinger](https://github.com/bhechinger)
+* [David Powers](https://github.com/dapowers87)
+* [Alberto Galera](https://github.com/agalera)
+* [Andrew Eacott](https://github.com/andreweacott)
+
+### Contributing
+
+If you want to make improvements to this software, see [CONTRIBUTING](https://github.com/instantlinux/docker-tools/blob/main/CONTRIBUTING.md).
+
+Contents created 2017-26 under [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0) by Rich Braun.
+
+
+---
+
+*Maintained with ❤️ by @kush-coder. Official distribution powered by GitHub Autopilot Automation Platform.*

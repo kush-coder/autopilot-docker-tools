@@ -1,0 +1,24 @@
+{{ ansible_managed | comment(decoration="; ") }}
+
+;       This file holds the information on root name servers needed to 
+;       initialize cache of Internet domain name servers
+;       (e.g. reference this file in the "cache  .  <file>"
+;       configuration file of BIND domain name servers). 
+; 
+;       This file is made available by InterNIC 
+;       under anonymous FTP as
+;           file                /domain/named.cache 
+;           on server           FTP.INTERNIC.NET
+;       -OR-                    RS.INTERNIC.NET
+; 
+;       last update:     {{ bind9.root_params.updated }}
+;       related version of root zone:     xxxx
+{% for key, server in bind9.root_servers.items() %}
+; 
+; OPERATED BY {{ server.org }}
+;
+.                        {{ bind9.root_params.ttl }}      NS    {{ key }}.ROOT-SERVERS.NET.
+{{ key }}.ROOT-SERVERS.NET.      {{ bind9.root_params.ttl }}      A     {{ server.A }}
+{{ key }}.ROOT-SERVERS.NET.      {{ bind9.root_params.ttl }}      AAAA  {{ server.AAAA }}
+{% endfor -%}
+; End of file

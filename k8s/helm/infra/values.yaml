@@ -1,0 +1,57 @@
+# Default values for infra.
+#  These sections are optional (add 'enabled: false' override to disable
+#  any that aren't applicable to your environment):
+#    adminUser, certManager, k8sBackup, limits, localStorage, rsyslogExt
+#  To disable gateway resources, override with an empty list [].
+namespace: default
+adminUser:
+  name: admin-user
+certManager:
+  email: admin@example.com
+  issuer:
+    prod: letsencrypt-prod
+    # Add this override for testing
+    # staging: letsencrypt-staging
+  internalCA:
+    rootCert:
+      duration: 43800h
+      renewBefore: 2160h
+    commonName: Internal Root
+    subject:
+      countries: [ US ]
+      localities: [ San Francisco ]
+      organizations: [ Example Inc ]
+      organizationalUnits: [ ]
+      provinces: [ California ]
+  solvers:
+  - solver: http01
+    gateway: gateway-1
+    enabled: false
+gateways:
+- name: gateway-1
+  # gateway resources will launch in the namespace defined at top; to
+  #  allow listenersets from other namespaces, list them here
+  # allowNamespaces: [ myapp ]
+  accessLog: false
+  class: envoy-internal
+  config: envoy-config-internal
+  crdNamespace: envoy-gateway-system
+  listeners: []
+  nodeport_http: 30080
+  nodeport_https: 30443
+k8sBackup:
+  destPath: /var/backup/k8s
+  etcdVersion: 3.5.15-0
+  # 4:10am PST is 12:10pm UTC - k8s cron only supports UTC
+  schedule: "10 12 * * *"
+limits:
+  cpu:
+    default: 500m
+    request: 50m
+  mem:
+    default: 256Mi
+    request: 64Mi
+localStorage:
+  name: local-storage
+rsyslogExt:
+  nodePort: 30514

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: haproxy-keepalived
+description: Load balancer with haproxy and keepalived
+home: https://github.com/instantlinux/docker-tools
+sources:
+- https://github.com/instantlinux/docker-tools
+- https://github.com/haproxy/haproxy
+- https://github.com/acassen/keepalived
+type: application
+version: 3.4.6-1
+appVersion: "3.4.6-alpine-2.3.4-r2"
+dependencies:
+- name: chartlib
+  version: 0.1.12
+  repository: oci://ghcr.io/instantlinux/charts
+  # also available at oci://registry-1.docker.io/instantlinux

@@ -1,0 +1,101 @@
+# This is an example where https://monitor.$domain is hosted outside
+#  kubernetes. Specify its IP address in env var MONITOR_EXT_IP.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    kubernetes.io/service-name: $SERVICE_NAME
+  name: $SERVICE_NAME
+  namespace: $K8S_NAMESPACE
+spec:
+  ports:
+  - { port: 80, targetPort: 80, name: monitor }
+  type: ClusterIP
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: $SERVICE_NAME
+  namespace: $K8S_NAMESPACE
+  labels:
+    kubernetes.io/service-name: $SERVICE_NAME
+addressType: IPv4
+endpoints:
+  - addresses: [ $MONITOR_EXT_IP ]
+ports:
+  - name: monitor
+    protocol: TCP
+    port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: ListenerSet
+metadata:
+  name: $SERVICE_NAME
+  namespace: $K8S_NAMESPACE
+  labels:
+    app.kubernetes.io/name: $SERVICE_NAME
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  parentRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-2
+    namespace: $K8S_NAMESPACE
+  listeners:
+  - name: https
+    hostname: $SERVICE_NAME.$DOMAIN
+    port: 443
+    protocol: HTTPS
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: tls-$SERVICE_NAME
+  - name: http
+    hostname: $SERVICE_NAME.$DOMAIN
+    port: 80
+    protocol: HTTP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: $SERVICE_NAME
+  namespace: $K8S_NAMESPACE
+spec:
+  parentRefs:
+  - kind: ListenerSet
+    name: $SERVICE_NAME
+    sectionName: https
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: $SERVICE_NAME
+      port: 80
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: $SERVICE_NAME
+      port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: $SERVICE_NAME-https-redirect
+  namespace: $K8S_NAMESPACE
+spec:
+  parentRefs:
+  - kind: ListenerSet
+    name: $SERVICE_NAME
+    sectionName: http
+  rules:
+  - filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+        statusCode: 308

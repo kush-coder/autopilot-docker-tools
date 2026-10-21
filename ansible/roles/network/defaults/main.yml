@@ -1,0 +1,109 @@
+---
+ca_trust_defaults:
+  path: /usr/local/share/ca-certificates
+  certificates: []
+ca_trust: "{{ ca_trust_defaults | combine(ca_trust_override) }}"
+
+kernel_modules:
+  - ip_vs
+
+# This almost always needs to be specified in inventory, each host
+#  comes up differently
+network_interface_physical: eth0
+
+network_defaults:
+  address: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+  addresses:
+  -  "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}/24"
+  gateway: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['gateway'] }}"
+  interface: "{{ network_interface_physical }}"
+  mode: dhcp
+  nameservers: "{{ hostvars[inventory_hostname]['ansible_dns']['nameservers'] }}"
+  netmask: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['netmask'] }}"
+  optional: false
+  routes:
+  - to: default
+    via: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['gateway'] }}"
+  search: "{{ hostvars[inventory_hostname]['ansible_dns']['search'] }}"
+  tailscale:
+    enabled: false
+    port: 41641
+    telemetry: false
+  cluster_ip: null
+  vrrp_interface: null
+
+network_override: {}
+network: "{{ network_defaults | combine(network_override, recursive=True) }}"
+
+network_sysctl:
+  net.ipv4.ip_nonlocal_bind: 1
+
+msmtp_defaults:
+  enabled: false
+  config:
+    defaults: ""
+    syslog: LOG_MAIL
+    account: default
+    host: smtp
+    port: 587
+    from: root
+msmtp_override: {}
+msmtp: "{{ msmtp_defaults | combine(msmtp_override, recursive=True) }}"
+
+sshd_opts_defaults:
+  ciphers:
+  - aes128-cbc
+  - aes128-ctr
+  - aes192-ctr
+  - aes256-ctr
+  kexalgorithms:
+  - sntrup761x25519-sha512@openssh.com
+  - mlkem768x25519-sha256
+  - curve25519-sha256
+  - curve25519-sha256@libssh.org
+  - ecdh-sha2-nistp256
+  - ecdh-sha2-nistp521
+  macs: 
+  - hmac-sha2-256
+  - hmac-sha2-512
+  - umac-64@openssh.com
+sshd_opts_override: {}
+sshd_opts: "{{ sshd_opts_defaults | combine(sshd_opts_override) }}"
+
+ubuntu_packages:
+  - bridge-utils
+  - dnsutils
+  - net-tools
+  - psmisc
+  - socat
+
+vrrp:
+  VI_1:
+    id: 50
+    ip: "{{ network.cluster_ip }}"
+    interface: "{{ network.vrrp_interface }}"
+    priority: "{{ network.address.split('.')[3] }}"
+    unicast_peers: "{{ groups['k8s_nodes'] | map('extract', hostvars,
+                       ['ansible_default_ipv4', 'address']) | list |
+                       difference([network.address]) }}"
+
+netplan_unbridged:
+  network:
+    version: 2
+    renderer: networkd
+
+# Netplan configuration is very different when running with /dev/br0
+netplan_bridged:
+  network:
+    version: 2
+    renderer: networkd
+    bridges:
+      br0:
+        addresses: "{{ network.addresses }}"
+        nameservers:
+          search: "{{ ansible_dns.search }}"
+          addresses: "{{ network.nameservers }}"
+        parameters:
+          stp: false
+          forward-delay: 0
+        routes: "{{ network.routes }}"

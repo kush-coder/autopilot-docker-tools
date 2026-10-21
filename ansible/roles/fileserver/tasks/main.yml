@@ -1,0 +1,68 @@
+---
+- name: Install system packages
+  apt:
+    name: "{{ ubuntu_packages }}"
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Python pip package
+  apt:
+    name: python3-pip
+  when: ansible_facts['distribution_version'] >= '20.04'
+
+- name: Python pip package
+  apt:
+    name: python-pip
+  when: ansible_facts['distribution_version'] < '20.04'
+
+- import_tasks: nfs.yml
+  when: nfs_exports | length > 0
+
+- name: Disable nfs-server
+  systemd:
+    name: nfs-server
+    state: stopped
+    enabled: no
+  when: nfs_exports | length == 0
+
+- name: Disable rpcbind if no network volumes
+  systemd:
+    name: rpcbind
+    state: stopped
+    enabled: no
+  when: nfs_exports | length == 0
+
+- import_tasks: instantlinux.yml
+  when: instantlinux_legacy.enabled
+
+- import_tasks: samba.yml
+  when: samba.enabled
+
+- name: Disable smbd service
+  systemd:
+    name: smbd
+    state: stopped
+    enabled: no
+  when: not samba.enabled
+
+- name: Disable nmbd service
+  systemd:
+    name: nmbd
+    state: stopped
+    enabled: no
+  when: not samba.enabled
+
+- import_tasks: qemu.yml
+  when: qemu.enabled
+
+- import_tasks: virtualbox.yml
+  when: virtualbox.enabled
+
+- import_tasks: vsftpd.yml
+  when: vsftpd.enabled
+
+- name: Disable vsftpd service
+  systemd:
+    name: vsftpd
+    state: stopped
+    enabled: no
+  when: not vsftpd.enabled

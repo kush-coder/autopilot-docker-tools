@@ -1,0 +1,23 @@
+# Default values for synapse-admin
+tlsHostname: synapse-admin.example.com
+deployment:
+  containerPorts: [ containerPort: 80 ]
+  env:
+    react_app_server: http://synapse-admin.example.com
+image:
+  repository: awesometechnologies/synapse-admin
+  pullPolicy: IfNotPresent
+  # tag: default
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  enabled: false
+service:
+  ports: [ port: 80 ]
+  type: ClusterIP
+autoscaling:
+  enabled: false
+gateway:
+  enabled: true

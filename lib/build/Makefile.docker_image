@@ -1,0 +1,117 @@
+# Standard Makefile for Docker image
+#   created by richb@instantlinux.net 20-Apr-2017
+
+BUILDX      = https://github.com/docker/buildx/releases/download/v0.38.0/buildx-v0.38.0.linux-amd64
+PLATFORMS  ?= linux/amd64
+PUSH       ?= --push
+USER_LOGIN ?= instantlinux
+VENV        = python_env
+VDIR        = $(PWD)/$(VENV)
+
+export IMAGE_NAME  = $(REGISTRY)/$(IMAGE):$(TAG)
+export IMAGE_REPO  = $(USER_LOGIN)/$(IMAGE)
+
+ifneq ($(CI_COMMIT_TAG),)
+  TAG_OPT   = --tag $(USER_LOGIN)$(IMAGE):$(CI_COMMIT_TAG)      
+endif
+
+# Exceptions
+ifeq ($(IMAGE),blacklist)
+  PLATFORMS = linux/amd64
+endif
+ifeq ($(IMAGE),data-sync)
+  PLATFORMS = linux/amd64,linux/aarch64
+endif
+ifeq ($(IMAGE),mariadb-galera)
+  PLATFORMS = linux/amd64
+endif
+ifeq ($(IMAGE),mythtv-backend)
+  PLATFORMS = linux/amd64
+endif
+ifeq ($(IMAGE),nagiosql)
+  PLATFORMS = linux/amd64,linux/arm64,linux/arm/v7
+endif
+ifeq ($(IMAGE),postfix-python)
+  # qemu bombs out with cpu_exec assertion since Dec 2023 on arm/v7
+  PLATFORMS = linux/amd64,linux/aarch64,linux/arm64
+endif
+ifeq ($(IMAGE),spamassassin)
+  PLATFORMS = linux/amd64
+  # TODO restore arm64 when this error gets fixed:
+  # /usr/bin/tar: dcc-2.3.169/dcc.html.in: Cannot open: Function not implemented
+endif
+
+analysis: flake8
+	  @echo "Running static analysis"
+
+test_functional:
+	@echo "Running functional verification of running image"
+
+create_image: $(HOME)/.docker/cli-plugins/docker-buildx
+	docker buildx build --tag $(REGISTRY)/$(IMAGE):$(TAG) \
+	  --platform $(PLATFORMS) --provenance=false --sbom=false \
+	  $(PUSH) --file Dockerfile . \
+	  --build-arg=VCS_REF=$(CI_COMMIT_SHA) \
+	  --build-arg=BUILD_DATE=$(shell date +%Y-%m-%dT%H:%M:%SZ)
+
+promote_image: $(HOME)/.docker/cli-plugins/docker-buildx
+	# Log into dockerhub and ghcr
+	echo $(DOCKER_TOKEN) | docker login -u $(USER_LOGIN) --password-stdin
+	echo $(GHCR_PUBLISH) | docker login -u $(USER_LOGIN) --password-stdin ghcr.io
+	TAG=$$(hooks/add_tags) && \
+	docker buildx build $(TAG_OPT) --platform $(PLATFORMS) \
+	  --attest type=provenance,mode=max,version=v1 --sbom=true \
+	  --tag $(IMAGE_REPO):latest \
+	  --tag ghcr.io/$(IMAGE_REPO):latest \
+	  --tag $(IMAGE_REPO):$$TAG \
+	  --tag ghcr.io/$(IMAGE_REPO):$$TAG \
+	  --push --file Dockerfile . \
+	  --build-arg=VCS_REF=$(CI_COMMIT_SHA) \
+	  --build-arg=BUILD_DATE=$(shell date +%Y-%m-%dT%H:%M:%SZ)
+
+	# update dockerhub README
+	# jq --arg or --rawfile escapes special characters / newlines
+	JSON=$$(jq -n --arg pwd "$(DOCKER_TOKEN)" --arg user "$(USER_LOGIN)" \
+	  '{username: $$user, password: $$pwd}') && \
+	JWT=$$(curl -s -H "Content-Type: application/json" -X POST \
+	  -d "$$JSON" https://hub.docker.com/v2/users/login/ | jq -r .token) && \
+	RESP=$$(jq -n --rawfile desc README.md '{"full_description": $$desc}' | \
+	  curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+	  -H "Content-Type: application/json" \
+	  -H "Authorization: Bearer $$JWT" \
+	  -d @- https://hub.docker.com/v2/repositories/$(IMAGE_REPO)/) && \
+	[ "$$RESP" -eq 200 ] || exit 1
+
+flake8: test_requirements
+	@echo "Running flake8 code analysis"
+	(. $(VDIR)/bin/activate ; flake8 --exclude=python_env .)
+
+python_env: $(VDIR)/bin/python
+
+test_requirements: python_env
+	@echo "Installing test requirements"
+	(if [ -f requirements/test.txt ]; then \
+	  . $(VDIR)/bin/activate && \
+	  pip install -r requirements/test.txt -r requirements/common.txt; \
+	 fi)
+
+$(VDIR)/bin/python:
+	@echo "Creating virtual environment"
+	virtualenv --system-site-packages $(VENV)
+
+$(HOME)/.docker/cli-plugins/docker-buildx:
+	mkdir -p $(HOME)/.docker/cli-plugins/
+	wget -O $(HOME)/.docker/cli-plugins/docker-buildx $(BUILDX)
+	chmod +x $(HOME)/.docker/cli-plugins/docker-buildx
+	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+	docker buildx create --name multibuild
+	docker buildx use multibuild
+
+clean:
+	@echo "Cleaning out generated files"
+	@rm -rf ./app/{.coverage,htmlcov,coverage.xml}
+	@find . -name \*.pyc -exec rm {} \;
+	@find . -name \*.log -exec rm {} \;
+	@find . -name \*~ -exec rm {} \;
+	@find . -name results.xml -exec rm {} \;
+	@find . -name __pycache__ -exec rm -fr {} \;

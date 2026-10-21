@@ -1,0 +1,14 @@
+apiVersion: v2
+name: vaultwarden
+description: Self-hosted bitwarden vault service
+home: https://github.com/instantlinux/docker-tools
+sources:
+- https://github.com/instantlinux/docker-tools
+type: application
+version: 1.37.4
+appVersion: "1.37.4-alpine"
+dependencies:
+- name: chartlib
+  version: 0.1.11
+  repository: oci://ghcr.io/instantlinux/charts
+  # also available at oci://registry-1.docker.io/instantlinux

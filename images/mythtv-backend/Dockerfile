@@ -1,0 +1,51 @@
+FROM ubuntu:resolute
+ARG BUILD_DATE
+ARG VCS_REF
+LABEL org.opencontainers.image.authors="Rich Braun docker@instantlinux.net" \
+    org.opencontainers.image.source=https://github.com/instantlinux/docker-tools \
+    org.label-schema.license=GPL-2.0 \
+    org.label-schema.name=mythtv-backend \
+    org.label-schema.vcs-ref=$VCS_REF \
+    org.label-schema.vcs-url=https://github.com/instantlinux/docker-tools
+
+ENV DBNAME=mythtv \
+    DBSERVER=db00 \
+    DEBIAN_FRONTEND=noninteractive \
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    LOCALHOSTNAME= \
+    TZ=UTC
+
+ARG MYTHTV_GID=100
+ARG MYTHTV_UID=2021
+ARG MYTHTV_PPA=ppa:mythbuntu/36
+ARG MYTHTV_VERSION=36.0-fixes.202610052224.b6ed364d3f
+ARG MYTHLINK_SHA=459cb8b60adae4b631a95a9cfb1b41dcb959cc4a0b9053582a711d58b8d8a0d2
+
+RUN \
+  rm /usr/bin/pebble && \
+  apt-get -yq update && \
+  apt-get install -yq gnupg locales software-properties-common wget && \
+  add-apt-repository $MYTHTV_PPA && \
+  apt-get -yq update && \
+  locale-gen $LANG && \
+  echo "# added via Dockerfile\npath-include=/usr/share/doc/mythtv-backend/contrib/*" > \
+   /etc/dpkg/dpkg.cfg.d/mythtv-backend && \
+  VER=2:$(echo $MYTHTV_VERSION | tr - +)~ubuntu26.04.1 && \
+  apt-get -yq --no-install-recommends install \
+    curl iputils-ping less lsb-release mariadb-client net-tools \
+    mythtv-backend=$VER mythtv-common=$VER mythtv-transcode-utils=$VER \
+    libmyth-python libmythtv-perl libjson-xs-perl psmisc sudo tzdata v4l-utils \
+    vim xmltv
+
+COPY src/ /root/
+RUN \
+  usermod -u $MYTHTV_UID -s /bin/bash mythtv && \
+  mkdir -p /var/lib/mythtv && \
+  echo "mythtv:mythtv" | chpasswd && \
+  chown $MYTHTV_UID:$MYTHTV_GID /var/lib/mythtv && \
+  ln -s /usr/share/doc/mythtv-backend/contrib/user_jobs/mythlink.pl /usr/bin
+
+EXPOSE 5000/udp 5002/udp 5004/udp 6543 6544 6549 65001 65001/udp 
+ENTRYPOINT ["/root/entrypoint.sh"]

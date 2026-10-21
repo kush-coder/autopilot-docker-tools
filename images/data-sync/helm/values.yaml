@@ -1,0 +1,153 @@
+# Default values for data-sync.
+statefulset:
+  containerPorts: [ containerPort: 22 ]
+  env:
+    sync_interval: "10"
+    tz: UTC
+  xenv:
+  - name: PUBKEY1
+    valueFrom:
+      secretKeyRef:
+        name: data-sync-ssh
+        key: pubkey1
+  - name: PUBKEY2
+    valueFrom:
+      secretKeyRef:
+        name: data-sync-ssh
+        key: pubkey2
+  nodeSelector:
+    service.data-sync: allow
+  replicas: 2
+  resources:
+    limits:
+      memory: 4096Mi
+    requests:
+      memory: 256Mi
+
+volumeMounts:
+- name: archive
+  mountPath: /root/.unison
+- name: config
+  mountPath: /etc/unison.d/common.prf
+  subPath: common.prf
+- mountPath: /etc/ssh
+  name: etc
+- mountPath: /var/log/unison
+  name: logs
+- mountPath: /var/data-sync/share
+  name: share
+# Customize your list of mounted volumes here
+- mountPath: /run/secrets/data-sync-sshkey1
+  name: sshkeys
+  subPath: sshkey1
+- mountPath: /run/secrets/data-sync-sshkey2
+  name: sshkeys
+  subPath: sshkey2
+volumes:
+- name: config
+  configMap:
+    name: data-sync
+- name: sshkeys
+  secret:
+    secretName: data-sync-ssh
+- name: logs
+  hostPath: { path: /var/lib/docker/k8s-volumes/sync-logs/data-sync }
+volumeClaimTemplates:
+- metadata:
+    name: archive
+  spec:
+    accessModes: [ ReadWriteOnce ]
+    resources:
+      requests:
+        storage: 500Mi
+- metadata:
+    name: etc
+  spec:
+    accessModes: [ ReadWriteOnce ]
+    resources:
+      requests:
+        storage: 500Mi
+- metadata:
+    name: share
+  spec:
+    accessModes: [ ReadWriteMany ]
+    resources:
+      requests:
+        storage: 8Gi
+    selector:
+      matchLabels:
+        volume.group: share
+
+image:
+  repository: instantlinux/data-sync
+  pullPolicy: IfNotPresent
+  # tag: default
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount: {}
+service:
+  clusterIP: None
+  ports:
+  - port: 22
+    targetPort: 22
+
+autoscaling:
+  enabled: false
+
+configmap:
+  data:
+    common.prf: |
+      # Directives for unison
+      ignore = Name .Xauthority
+      ignore = Name DVRWorkDirectory
+      ignore = Name ldapi
+      ignore = Name lost+found
+      ignore = Name msg.sock
+      ignore = Name *socket
+      ignore = Name .s.PGSQL.5432
+      ignore = Name atlassian-*.log
+      ignore = Name pgstat.stat
+      ignore = Name py3ttvdb4.sqlite
+      ignore = Path data-sync/share/headscale/db.sqlite-shm
+      ignore = Path data-sync/share/nagios/var/rw
+      ignore = Path data-sync/share/openldap/data/lock.mdb
+      ignore = Path data-sync/share/snappymail/data/_default_/cache
+      ignore = Path data-sync/dos
+      ignore = Path data-sync/home/*/.kube/cache
+      ignore = Path data-sync/jira/home/analytics-logs
+      ignore = Path data-sync/jira/home/log/automation-jira-performance.csv
+      ignore = Path data-sync/jira/home/monitor/ConnectionPoolGraph.rrd4j
+      ignore = Path data-sync/jira/home/monitor/DatabaseReadWritesGraph.rrd4j
+      ignore = Path data-sync/jira/home/log/jfr
+      ignore = Path data-sync/jira/home/plugins/.osgi-plugins
+      ignore = Path data-sync/jira/logs/access_*
+      ignore = Path data-sync/nexus/db/accesslog
+      ignore = Path data-sync/nexus/db/analytics/analytics*
+      ignore = Path data-sync/nexus/db/analytics/metrics_log*
+      ignore = Path data-sync/nexus/db/config/quartz_trigger*
+      ignore = Path data-sync/nexus/log/audit/audit.log
+      ignore = Path redis/current
+      ignore = Path data-sync/samba-dc/var/lib/winbindd_privileged/pipe
+      ignore = Path data-sync/syslog/log/messages
+      ignore = Path data-sync/syslog/log/secure
+      ignore = Path data-sync/nexus/elasticsearch
+      ignore = Path data-sync/nexus/log/nexus.log
+      ignore = Path data-sync/nexus/log/request.log
+
+      auto   = true
+      batch  = true
+      confirmbigdel = true
+      # SYS-400 overall performance is absolutely awful without this
+      fastercheckUNSAFE = true
+
+      group  = true
+      owner  = true
+      times  = true
+
+      prefer = newer
+      silent = true
+
+      sshargs = -i /root/.ssh/data-sync.rsa
+      logfile = /var/log/unison/unison.log

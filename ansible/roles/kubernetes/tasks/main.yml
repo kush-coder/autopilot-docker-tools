@@ -1,0 +1,101 @@
+---
+- name: k8s repo
+  ansible.builtin.deb822_repository:
+    name: k8s
+    types: [ deb ]
+    uris: "{{ k8s.apt_repo.url }}"
+    suites: [ / ]
+    signed_by: "{{ k8s.apt_repo.url }}/Release.key"
+
+- name: Install system packages
+  apt:
+    name: "{{ ubuntu_packages }}"
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Load kernel modules
+  modprobe:
+    name: "{{ item }}"
+  with_items: "{{ k8s_kernel_modules }}"
+
+- name: Add kernel modules to /etc/modules-load.d
+  copy:
+    content: "{{ k8s_kernel_modules | join('\n') | string }}\n"
+    dest: /etc/modules-load.d/20-network.conf
+
+- name: Look for swap entries
+  shell: grep swap /etc/fstab | awk '{ print $1; }'
+  register: swapdevs
+  changed_when: False
+
+- name: Disable swap
+  mount:
+    fstype: swap
+    path: none
+    src: "{{ item }}"
+    state: absent
+  with_items: "{{ swapdevs.stdout_lines }}"
+
+- name: Turn swap off
+  command: swapoff --all
+  changed_when: False
+
+- name: Sysctl tuning parameters
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_set: yes
+  with_dict: "{{ sysctl }}"
+
+- name: Set static hostname as FQDN
+  command: hostnamectl --static set-hostname {{ inventory_hostname }}
+  when: inventory_hostname != ansible_facts['hostname']
+  changed_when: False
+
+- include_tasks: cri-dockerd.yml
+
+- name: Set up control plane
+  include_tasks: cplane.yml
+  when: k8s.cplane
+
+- name: Join cluster
+  include_tasks: join.yml
+  when: not k8s.cplane
+
+- name: Add RequiresMountsFor to kubelet.service
+  copy:
+    dest: /lib/systemd/system/kubelet.service.d/20-requires.conf
+    content: |
+      [Unit] 
+      RequiresMountsFor=/var/lib/kubelet
+  when: not k8s.cplane
+
+- name: Add systemd unit file for disabling transparent huge pages
+  copy:
+    dest: /etc/systemd/system/disable-thp.service
+    src: disable-thp.service
+
+- name: Start disable-thp service
+  systemd:
+    daemon_reload: yes
+    enabled: yes
+    name: disable-thp
+    state: started
+  when: not k8s.cplane
+  # Resource systemd reports spurious changes even when there are none
+  changed_when: False
+
+- name: Add kubelet service
+  systemd:
+    daemon_reload: yes
+    name: "{{ k8s.service.name }}"
+    state: "{{ k8s.service.state }}"
+    enabled: "{{ k8s.service.enabled }}"
+  changed_when: False
+
+- name: Create local_vols shared directory
+  file:
+    name: "{{ item }}"
+    state: directory
+  with_items:
+  - "{{ k8s.local_vols }}"
+  - "{{ k8s.local_vols }}/share"

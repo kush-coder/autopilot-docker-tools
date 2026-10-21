@@ -1,0 +1,44 @@
+{{- if or .Values.k8sBackup.enabled (not (hasKey .Values "k8sBackup.enabled")) }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup
+  namespace: kube-system
+spec:
+  schedule: {{ .Values.k8sBackup.schedule }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            # Same image as in /etc/kubernetes/manifests/etcd.yaml
+            image: registry.k8s.io/etcd:{{ .Values.k8sBackup.etcdVersion }}
+            command: ["/bin/sh"]
+            args: ["-c", "etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt --key=/etc/kubernetes/pki/etcd/healthcheck-client.key snapshot save /backup/etcd-snapshot-$(printf '%(%y-%m-%d_%T)T').db"]
+            env:
+            - name: ETCDCTL_API
+              value: "3"
+            volumeMounts:
+            - mountPath: /etc/kubernetes/pki/etcd
+              name: etcd-certs
+              readOnly: true
+            - mountPath: /backup
+              name: backup
+          hostNetwork: true
+          nodeSelector:
+            node-role.kubernetes.io/control-plane: ""
+          tolerations:
+          - effect: NoSchedule
+            operator: Exists
+          restartPolicy: OnFailure
+          serviceAccountName: admin-user
+          volumes:
+          - name: etcd-certs
+            hostPath:
+              path: /etc/kubernetes/pki/etcd
+              type: Directory
+          - name: backup
+            hostPath: { path: {{ .Values.k8sBackup.destPath }} }
+{{- end }}

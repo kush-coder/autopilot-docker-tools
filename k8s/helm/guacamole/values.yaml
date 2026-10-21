@@ -1,0 +1,41 @@
+# Default values for guacamole.
+guacd:
+  image:
+    tag: 1.6.0
+  deployment:
+    resources:
+      limits:
+        memory: 1536Mi
+      requests:
+        cpu: 100m
+        memory: 512Mi
+guacamole-server:
+  image:
+    tag: 1.6.0
+  tlsHostname: guacamole.example.com
+  deployment:
+    env:
+      # TODO: enable the BAN extension introduced in 1.6.0; for now
+      #   break-in attempts are blocked by TOTP because BAN requires
+      #   more ingress-nginx directives to provide proxy IP address
+      ban_enabled: "false"
+      guacd_hostname: guacamole-guacd
+      guacd_port: 4822
+      ldap_enabled: "false"
+      mysql_database: guacamole
+      mysql_hostname: db00
+      mysql_username: guacamole_user
+      skip_if_unavailable: ldap
+      totp_enabled: "true"
+    xenv:
+    - name: MYSQL_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: guacamole-db-password
+          key: guacamole-db-password
+    resources:
+      limits:
+        memory: 1024Mi
+      requests:
+        cpu: 100m
+        memory: 768Mi

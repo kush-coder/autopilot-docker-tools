@@ -1,0 +1,23 @@
+apiVersion: v2
+name: guacamole
+description: Apache Guacamole remote desktop service
+home: https://github.com/instantlinux/docker-tools
+sources:
+- https://github.com/instantlinux/docker-tools
+- https://github.com/apache/guacamole-client
+- https://github.com/apache/guacamole-server
+type: application
+version: 1.6.0
+# When updating appVersion, also update subcharts, and the dependencies
+#  for guacamole-server and guacd below
+appVersion: "1.6.0"
+dependencies:
+- name: chartlib
+  version: 0.1.11
+  repository: oci://registry-1.docker.io/instantlinux
+- name: guacamole-server
+  version: 0.1.8
+  repository: file://subcharts/guacamole-server
+- name: guacd
+  version: 0.1.7
+  repository: file://subcharts/guacd

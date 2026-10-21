@@ -1,0 +1,6 @@
+#! /bin/bash
+{{ ansible_managed | comment }}
+xset s off
+xset -dpms
+# To activate HDMI audio, turn on this mixer control:
+# amixer cset iface=MIXER,name='IEC958 Playback Switch' 1

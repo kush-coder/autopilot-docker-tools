@@ -1,0 +1,30 @@
+---
+
+- name: Virtualbox repo key
+  get_url:
+    url: "{{ item }}"
+    dest: /etc/apt/keyrings/{{ item | basename }}
+  with_items:
+  - "{{ virtualbox.apt_repo.key_urls }}"
+
+- name: Virtualbox repository
+  apt_repository:
+    repo: >
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/oracle_vbox_2016.asc]
+      {{ virtualbox.apt_repo.url }} {{ ansible_facts['distribution_release }} contrib
+    filename: virtualbox
+
+- name: Virtualbox package
+  package:
+    name: virtualbox
+  when: ansible_facts['distribution_version'] < '22.04'
+
+- name: Virtualbox package
+  package:
+    name: virtualbox-{{ virtualbox.version }}
+  when: ansible_facts['distribution_version'] >= '22.04'
+
+- name: Virtualbox systemd unit file
+  template:
+    dest: /lib/systemd/system/vboxvmservice@.service
+    src: vboxvmservice.j2

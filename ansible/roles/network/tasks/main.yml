@@ -1,0 +1,20 @@
+---
+- name: Install system packages
+  apt:
+    name: "{{ ubuntu_packages }}"
+
+- import_tasks: network_legacy.yml
+  when: ansible_facts['distribution_version'] < '18.04'
+
+- import_tasks: netplan.yml
+  when: ansible_facts['distribution_version'] >= '18.04'
+
+- import_tasks: tailscale.yml
+  when: network.tailscale.enabled
+
+- import_tasks: certificates.yml
+- import_tasks: kernel.yml
+- import_tasks: sshd.yml
+
+- import_tasks: msmtp.yml
+  when: msmtp.enabled

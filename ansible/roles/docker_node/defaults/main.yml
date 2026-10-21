@@ -1,0 +1,69 @@
+---
+# defaults
+
+docker_defaults:
+  apt_repo:
+    key: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+    package_name: docker-ce
+    package_ver: 5:29.9.1-1~ubuntu.26.04~resolute
+    url: https://download.docker.com/linux/ubuntu
+  certs:
+    ca_root: ca-root.pem
+    path: /root/certs
+  cli_opts: --containerd=/run/containerd/containerd.sock
+  compose:
+    sha256: acfa66dba77dac9635ff9b195ccea81768eb009ce9c9f1181c000eb95effb963
+    version: 1.15.0
+  local_volumes: /var/lib/docker/volumes
+  options:
+    hosts:
+    - tcp://0.0.0.0:2376
+    - unix:///var/run/docker.sock
+    log-driver: json-file
+    log-opts:
+      max-size: 50m
+      max-file: "3"
+    min-api-version: "1.43"
+    storage-driver: overlay2
+    tls: True
+    tlscacert: /root/certs/ca-root.pem
+    tlscert: /root/certs/docker-tls-cert.pem
+    tlskey: /root/certs/docker-tls-key.pem
+    tlsverify: True
+
+docker_override: {}
+docker: "{{ docker_defaults | combine(docker_override, recursive=True) }}"
+
+docker_volumewait: /var/lib/docker
+
+# Set non_stock to True to override your distro's kernel
+kernel:
+  long_ver: 4.15.0-041500.201802011154
+  origin: http://kernel.ubuntu.com/~kernel-ppa/mainline
+  short_ver: "041500"
+  version: 4.15.0
+  non_stock: False
+
+sysctl:
+  fs.inotify.max_user_instances: 256
+  fs.inotify.max_user_watches: 131072
+
+system_paths:
+  ca_certs: /usr/local/share/ca-certificates
+
+system_certs:
+  - ca-root.pem
+  - registry-cert.pem
+  
+ubuntu_packages:
+  - bash-completion
+  - jq
+  - libpam-google-authenticator
+  - rsync
+  - ssh-askpass
+  - snmpd
+  - thin-provisioning-tools
+  - uuid-runtime
+ubuntu_package_additions: []
+
+ubuntu_repo_uri: http://archive.ubuntu.com/ubuntu/

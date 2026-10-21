@@ -1,0 +1,22 @@
+---
+
+ntp_defaults:
+  driftfile: /var/lib/ntpsec/ntp.drift
+  leapfile: /usr/share/zoneinfo/leap-seconds.list
+  log_level: warn
+  query_ok:
+  - localhost
+  - ::1
+  pool:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+  service:
+    enabled: yes
+    name: "{{ 'ntpd-rs' if ansible_facts['os_family'] == 'Debian' else 'ntpd' }}"
+    state: restarted
+
+ntp_override: {}
+ntp: "{{ ntp_defaults | combine(ntp_override) }}"
+
+ubuntu_packages:
+  - ntpd-rs

@@ -1,0 +1,2 @@
+#!/bin/sh
+echo $(grep "ARG POSTFIX_VERSION" Dockerfile | cut -d= -f 2)

@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "local.fullname" . }}
+  labels:
+    {{- include "local.labels" . | nindent 4 }}
+data:
+  configuration.yml: |
+    # TODO - resolve env var conflict introduced in 4.30; requires
+    #  enableServiceLinks=false in pod spec
+    # server:
+    #   address: tcp://:80
+
+    # set to trace for troubleshooting
+    log:
+      level: {{ .Values.logLevel }}
+
+    authentication_backend:
+      ldap:
+        address: ldap://ldap
+        base_dn: {{ .Values.baseDN }}
+        users_filter: (&({username_attribute}={input})(objectClass=inetOrgPerson))
+        additional_users_dn: ou=users
+        additional_groups_dn: ou=groups
+        attributes:
+          display_name: sn
+          group_name: cn
+          mail: mail
+          username: uid
+        groups_filter: (&(member={dn})(objectclass=groupOfNames))
+        user: cn=admin,{{ .Values.baseDN }}
+
+    # Access Control
+    access_control:
+      default_policy: bypass
+      rules:
+      # TODO - deal with
+      # level=error msg="Policy [bypass] for rule #1 domain
+      # [xxx.ci.net] with subjects [[user:xxx]] is invalid. It
+      # is not supported to configure both policy bypass and
+      # subjects. For more information see:
+      # https://www.authelia.com/docs/configuration/access-control.html#combining-subjects-and-the-bypass-policy"
+      # - domain: {{ .Values.bypassDomain }}
+      #   policy: bypass
+      #   subject: {{ .Values.bypassUser }}
+      - domain:
+        {{- range .Values.domains }}
+        - "*.{{ . }}"
+        {{- end }}
+        policy: two_factor
+
+    # Webauthn / passkeys
+    webauthn:
+      disable: {{ not .Values.enable_webauthn }}
+      display_name: {{ .Values.display_name }}
+      enable_passkey_login: {{ .Values.enable_passkey }}
+
+    # Configuration of session cookies
+    session:
+      cookies:
+      - domain: {{ .Values.domain }}
+        authelia_url: https://{{ $.Values.tlsHostname }}
+        expiration: {{ .Values.session.expiration }}
+        inactivity: {{ .Values.session.inactivity }}
+      redis:
+        host: redis
+        port: 6379
+
+    # Configuration of the authentication regulation mechanism.
+    regulation:
+      max_retries: 3
+      find_time: 120
+      ban_time: 300
+
+    # The directory where the DB files will be saved
+    storage:
+      mysql:
+        address: {{ .Values.mysql.address }}
+        database: {{ .Values.mysql.database }}
+        username: {{ .Values.mysql.username }}
+
+    # Configuration of the notification system.
+    notifier:
+      smtp:
+        address: {{ .Values.smtp.address }}
+        username: {{ .Values.smtp.username }}
+        sender: {{ .Values.smtp.sender }}

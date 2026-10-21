@@ -1,0 +1,106 @@
+{{ $labels := include "local.labels" . -}}
+{{- range $gateway := .Values.gateways }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: {{ $gateway.class }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: {{ $gateway.config }}
+    namespace: {{ $gateway.crdNamespace | default "envoy-gateway-system" }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ $gateway.config }}
+  namespace: {{ $gateway.crdNamespace | default "envoy-gateway-system" }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: NodePort
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - name: http
+                  port: 80
+                  protocol: TCP
+                  nodePort: {{ $gateway.nodeport_http }}
+                - name: https
+                  port: 443
+                  protocol: TCP
+                  nodePort: {{ .nodeport_https }}
+  {{- if or (not (hasKey $gateway "accessLog")) (not $gateway.accessLog) }}
+  telemetry:
+    accessLog:
+      disable: true
+  {{- end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $gateway.name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  gatewayClassName: {{ $gateway.class }}
+  allowedListeners:
+    namespaces:
+      from: Selector
+      selector:
+        matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values:
+          - {{ $.Values.namespace }}
+          {{- if hasKey $gateway "allowNamespaces" }}
+          {{- toYaml $gateway.allowNamespaces | nindent 10 }}
+          {{- end }}
+  listeners:
+  # at least one dummy listener is needed; here we also add support for
+  # TCP listeners; all http listeners are defined with ListenerSets
+  {{- if hasKey $gateway "listeners" }}
+  {{- range $gateway.listeners }}
+  - name: {{ .name }}
+    protocol: TCP
+    port: {{ .port }}
+    allowedRoutes:
+      kinds:
+      - kind: TCPRoute
+  {{- end }}
+  {{- else }}
+  - name: dummy
+    protocol: HTTP
+    port: 80
+  {{- end }}
+{{- range $gateway.listeners }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: TCPRoute
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  parentRefs:
+  - name: {{ $gateway.name }}
+    sectionName: {{ .name }}
+  rules:
+  - backendRefs:
+    - name: {{ .service }}
+      port: {{ .port }}
+{{- end }}
+{{- end }}

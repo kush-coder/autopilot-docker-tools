@@ -1,0 +1,12 @@
+---
+# Tighten security in sshd: lock out brute-force scanners seeking weak ciphers
+
+- name: Lock out brute-force scanners 
+  ansible.builtin.copy:
+    content: |
+      # ansible managed
+      Ciphers {{ sshd_opts.ciphers|join(',') }}
+      MACs {{ sshd_opts.macs|join(',') }}
+      KexAlgorithms {{ sshd_opts.kexalgorithms|join(',') }}
+    dest: /etc/ssh/sshd_config.d/10_ciphers.conf
+  notify: Restart sshd

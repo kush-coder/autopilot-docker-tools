@@ -1,0 +1,75 @@
+# Default values for nut-upsd.
+deployment:
+  env:
+    actions:
+    driver: usbhid-ups
+    instcmds: 
+    maxage: 15
+    notifycmd: 
+    nut_debug_level: 0
+    serial: mustbeset
+  securityContext:
+    privileged: true
+  strategy:
+    type: Recreate
+livenessProbe:
+  exec:
+    command:
+    - /bin/sh
+    - -c
+    - 'upsc ups@localhost:3493 2>&1|grep -q stale && exit 1 || true'
+  periodSeconds: 30
+volumeMounts:
+# TODO make this work with pod security policies instead of securityContext
+# - name: usb
+#   mountpath: /dev/ttyUSB0
+
+# To define a notify script, add this in your value overrides, set
+#    configmap.enabled, and add script under configmap.data.notify
+# - name: notifycmd
+#   mountPath: /usr/local/bin/notify
+#   readOnly: true
+#   subPath: notify
+- name: secret
+  mountPath: /run/secrets/nut-upsd-password
+  readOnly: true
+  subPath: nut-upsd-password
+volumes:
+# - name: usb
+#   hostPath: { path: /dev/ttyUSB0 }
+
+# - name: notifycmd
+#   configMap:
+#     name: nut-upsd
+#     defaultMode: 0555
+- name: secret
+  secret:
+    secretName: nut-upsd-password
+
+image:
+  repository: instantlinux/nut-upsd
+  pullPolicy: IfNotPresent
+  # tag: default
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  enabled: true
+  name: example-privileged
+
+service:
+  ports:
+  - port: 3493
+    nodePort: 30493
+    targetPort: 3493
+autoscaling:
+  enabled: false
+
+configmap:
+  enabled: false
+  name: nut-upsd
+  data: {}
+# data:
+#   notify: |
+#     your script here

@@ -1,0 +1,60 @@
+---
+# These are only examples: in a group_vars file, override these with
+#  your own volumes and network mounts
+
+fs_type: ext4
+
+# LUKS-encrypted volumes
+luks_volume_defaults: {}
+# example-volume:
+#   inodes: 100
+#   path: {{ local_k8s_root }}/backup
+#   size: 5000
+#   vg: "{{ luks_vg }}"
+
+luks_volume_additions: {}
+luks_volumes: "{{ luks_volume_defaults | combine(luks_volume_additions) }}"
+
+# Unencrypted local volumes
+local_volumes:
+  tmpfs:
+    path: /tmp
+    options: nodev,nosuid,nodiratime,size=1000M
+    type: tmpfs
+
+local_k8s_root: /var/lib/docker/k8s-volumes
+
+# Swap
+swap_vol_defaults:
+  enabled: false
+  lv: volswap
+  size: 4G
+  swappiness: 60
+  vg: vg0
+swap_vol_additions: {}
+
+swap_vol: "{{ swap_vol_defaults | combine(swap_vol_additions) }}"
+
+# Network volumes
+network_mounts:
+  nfs:/service:
+    path: /var/mounted
+    options: _netdev,ro,soft
+    type: nfs
+
+cifs_credentials:
+  file: /etc/security/cifs-credentials.txt
+  local_user: www-data
+  remote_user: nobody
+
+masterkey:
+  path: /master
+  host: 10.10.0.2
+  sshkey_private: /root/.ssh/master.pem
+  user: master
+
+ubuntu_packages:
+  - cifs-utils
+  - cryptsetup
+  - nfs-client
+  - sshfs

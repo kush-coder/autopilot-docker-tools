@@ -1,0 +1,15 @@
+apiVersion: v2
+name: element
+description: UI for Matrix
+home: https://element.io/app
+sources:
+- https://github.com/element-hq/element-web
+- https://hub.docker.com/r/vectorim/element-web
+type: application
+version: 0.1.1
+# specify version tag from hub.docker.com in top-level values.yaml
+appVersion: v0.0.1
+dependencies:
+- name: chartlib
+  version: 0.1.11
+  repository: oci://ghcr.io/instantlinux/charts

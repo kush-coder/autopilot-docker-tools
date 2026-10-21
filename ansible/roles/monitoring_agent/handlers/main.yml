@@ -1,0 +1,30 @@
+---
+
+- name: Restart journald
+  service:
+    name: systemd-journald
+    state: restarted
+
+- name: Restart NRPE
+  service:
+    name: "{{ nagios.nrpe_service }}"
+    state: restarted
+
+- name: Restart rsyslogd
+  systemd:
+    daemon_reload: yes
+    name: rsyslog
+    state: restarted
+
+- name: Restart snmpd
+  service:
+    name: snmpd
+    state: restarted
+
+- name: Restart prometheus-node-exporter
+  ansible.builtin.service:
+    name: prometheus-node-exporter
+    state: restarted
+
+- name: Reload apparmor
+  ansible.builtin.command: apparmor_parser -r /etc/apparmor.d/usr.sbin.rsyslogd

@@ -1,0 +1,36 @@
+---
+- name: Check out instantlinux source
+  ansible.builtin.git:
+    repo: 'https://git.instantlinux.net/richb/instantlinux.git/'
+    dest: /opt/instantlinux
+    update: no
+  ignore_errors: true
+
+- name: Link to usr/lib/ilinux
+  file:
+    dest: /var/lib/ilinux
+    force: yes
+    src: /opt/instantlinux/usr/lib/ilinux
+    state: link
+
+- name: Link cron
+  file:
+    dest: /var/lib/ilinux/cron
+    force: yes
+    src: /opt/instantlinux/var/lib/ilinux/cron
+    state: link
+
+- name: Link nagios
+  file:
+    dest: /var/lib/ilinux/nagios
+    force: yes
+    src: /opt/instantlinux/usr/lib/ilinux/support/nagios_nrpe
+    state: link
+
+- name: InstantLinux log
+  file:
+    dest: /var/log/ilinux
+    owner: capi
+    group: syslog
+    mode: 02770
+    state: directory

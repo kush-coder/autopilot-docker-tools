@@ -1,0 +1,76 @@
+---
+- name: Fetch asset metadata for cri-dockerd version from github
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/Mirantis/cri-dockerd/releases/tags/{{
+      cri_dockerd.version }}
+    headers:
+      Accept: "application/vnd.github+json"
+      X-GitHub-Api-Version: "2022-11-28"
+    return_content: true
+  register: cri_metadata
+
+- name: Get cri-dockerd download checksum
+  ansible.builtin.set_fact:
+    cri_meta_sha256: >-
+      {{
+        (cri_metadata.json.assets 
+         | selectattr('name', 'equalto', 'cri-dockerd-' + (cri_dockerd.version
+            | ansible.builtin.regex_replace('^v', '')) + '.amd64.tgz')
+         | map(attribute='digest') 
+         | first)
+      }}
+
+- name: Download cri-dockerd tarball
+  ansible.builtin.get_url:
+    url: https://github.com/Mirantis/cri-dockerd/releases/download/{{
+      cri_dockerd.version }}/cri-dockerd-{{ 
+      cri_dockerd.version | ansible.builtin.regex_replace('^v', '') }}.amd64.tgz
+    dest: /opt/cri-dockerd.tgz
+    checksum: "{{ cri_meta_sha256 }}"
+  notify: Restart cri-docker
+
+- name: Extract cri-dockerd binary
+  ansible.builtin.unarchive:
+    dest: /usr/bin
+    extra_opts: [ --strip-components=1 ]
+    remote_src: yes
+    src: /opt/cri-dockerd.tgz
+
+- name: Get cri-docker service definition
+  ansible.builtin.get_url:
+    dest: /etc/systemd/system/cri-docker.service
+    url: https://raw.githubusercontent.com/Mirantis/cri-dockerd/master/packaging/systemd/cri-docker.service
+
+- name: Get cri-docker socket definition
+  ansible.builtin.get_url:
+    dest: /etc/systemd/system/cri-docker.socket
+    url: https://raw.githubusercontent.com/Mirantis/cri-dockerd/master/packaging/systemd/cri-docker.socket
+
+- name: Override directory for cri-docker options
+  file:
+    dest: /etc/systemd/system/cri-docker.service.d
+    state: directory
+
+- name: Set cri-docker startup options
+  copy:
+    dest: /etc/systemd/system/cri-docker.service.d/opts.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/cri-dockerd --container-runtime-endpoint fd:// \
+      --network-plugin=cni \
+      --cni-bin-dir=/opt/cni/bin \
+      --cni-cache-dir=/var/lib/cni/cache \
+      --cni-conf-dir=/etc/cni/net.d
+
+- name: Enable cri-docker.service
+  ansible.builtin.systemd:
+    daemon_reload: yes
+    enabled: yes
+    name: cri-docker
+
+- name: Enable cri-docker.socket
+  ansible.builtin.systemd:
+    enabled: yes
+    name: cri-docker.socket
+    state: started

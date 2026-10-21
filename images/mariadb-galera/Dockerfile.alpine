@@ -1,0 +1,52 @@
+# Experimental - this "almost" works but SST transfers fail, apparently
+#  due to issues with the mariadb-backup script distributed with alpine;
+#  abandoned this in favor of the image distributed by MariaDB maintainers
+
+FROM python:3.14.0-alpine3.22
+ARG BUILD_DATE
+ARG VCS_REF
+LABEL org.opencontainers.image.authors="Rich Braun docker@instantlinux.net" \
+    org.label-schema.build-date=$BUILD_DATE \
+    org.label-schema.license=GPL-2.0 \
+    org.label-schema.name=mariadb-galera \
+    org.label-schema.vcs-ref=$VCS_REF \
+    org.label-schema.vcs-url=https://github.com/instantlinux/docker-tools
+
+ENV CLUSTER_NAME=cluster01 \
+    CLUSTER_SIZE=3 \
+    DISCOVERY_SERVICE=etcd:2379 \
+    PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python \
+    ROOT_SECNAME=mysql-root-password \
+    TTL=10 \
+    TZ=UTC \
+    SST_SECNAME=sst-auth-password
+
+ARG MARIADB_MAJOR=11.4
+ARG MARIADB_VERSION=11.4.8-r0
+ARG UID=212
+ARG GID=212
+
+COPY requirements/ /root/
+
+RUN addgroup -g $GID mysql && \
+    adduser -u $UID -G mysql -s /bin/false -g "MariaDB" -h /none -D mysql && \
+    apk add --update --no-cache \
+     bash curl galera jq mariadb=$MARIADB_VERSION \
+     mariadb-backup=$MARIADB_VERSION \
+     mariadb-client=$MARIADB_VERSION net-tools pv socat && \
+    pip install -r /root/common.txt && \
+    ln -s /usr/bin/mysqld /usr/sbin && \
+    rm -fr /var/log/* /var/lib/mysql/*
+
+EXPOSE 3306 4444 4567/udp 4567 4568
+VOLUME /var/lib/mysql
+
+HEALTHCHECK --interval=10s --timeout=3s --retries=30 \
+    CMD /bin/sh /usr/local/bin/healthcheck.sh || exit 1
+
+COPY wsrep.cnf my.cnf /etc/
+COPY src/entrypoint.py src/healthcheck.sh /usr/local/bin/
+COPY wsrep_sst_mariabackup /usr/bin/
+ENTRYPOINT ["/usr/local/bin/entrypoint.py"]
+
+# TODO: fix healthcheck.sh to handle long-duration bootstrap

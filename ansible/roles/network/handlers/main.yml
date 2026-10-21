@@ -1,0 +1,23 @@
+---
+- name: Restart keepalived
+  ansible.builtin.service:
+    enabled: yes
+    name: keepalived
+    state: restarted
+
+- name: Netplan apply
+  ansible.builtin.command: netplan apply
+
+- name: Restart sshd
+  ansible.builtin.service:
+    name: ssh
+    state: restarted
+
+- name: Update CA certificates
+  command: update-ca-certificates
+
+- name: Restart tailscaled
+  ansible.builtin.service:
+    enabled: yes
+    name: tailscaled
+    state: restarted
